@@ -11,4 +11,8 @@ router.get("/users/logout", auth, ctrlAuth.logout);
 
 router.get("/users/current", auth, ctrlAuth.getCurrent);
 
+router.get("/users/verify/:verificationToken", ctrlAuth.verify);
+
+router.post("/users/verify", ctrlAuth.resendEmail);
+
 module.exports = router;

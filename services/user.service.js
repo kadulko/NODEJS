@@ -1,9 +1,8 @@
 const User = require("../models/user.model");
 
-const createUser = async (email, password, avatarUrl) => {
-  const newUser = new User({ email });
+const createUser = async (email, password, avatarURL, verificationToken) => {
+  const newUser = new User({ email, avatarURL, verificationToken });
   newUser.setPassword(password);
-  newUser.avatarURL = avatarUrl;
   return newUser.save();
 };
 
@@ -13,6 +12,10 @@ const getUserByEmail = async (email) => {
 
 const getUserById = async (id) => {
   return User.findOne({ _id: id });
+};
+
+const getUserByVerificationToken = async (verificationToken) => {
+  return User.findOne({ verificationToken });
 };
 
 const saveToken = (id, token) => {
@@ -39,11 +42,21 @@ const updateAvatar = (id, fileName) => {
   );
 };
 
+const setUserAsVerified = (id) => {
+  return User.findByIdAndUpdate(
+    { _id: id },
+    { $set: { verify: true } },
+    { new: true }
+  );
+};
+
 module.exports = {
   createUser,
   getUserByEmail,
   getUserById,
+  getUserByVerificationToken,
   saveToken,
   removeToken,
   updateAvatar,
+  setUserAsVerified,
 };

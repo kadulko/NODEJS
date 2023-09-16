@@ -1,12 +1,14 @@
 require("dotenv").config();
 const service = require("../services/user.service");
+const emailService = require("../services/email.service");
 const jwt = require("jsonwebtoken");
 const secret = process.env.SECRET;
 const gravatar = require("gravatar");
+const { nanoid } = require("nanoid");
 
 const createUser = async (req, res, next) => {
   const { email, password } = req.body;
-  let user = await service.getUserByEmail(email);
+  const user = await service.getUserByEmail(email);
   if (user) {
     return res.status(409).json({
       status: "error",
@@ -16,11 +18,15 @@ const createUser = async (req, res, next) => {
     });
   }
   try {
-    user = await service.createUser(
+    const verificationToken = nanoid();
+    const user = await service.createUser(
       email,
       password,
-      gravatar.url(email, { d: "mp" }, true)
+      gravatar.url(email, { d: "mp" }, true),
+      verificationToken
     );
+
+    await emailService.sendVerificationEmail(user.email, verificationToken);
 
     res.status(201).json({
       status: "success",
@@ -42,6 +48,14 @@ const login = async (req, res, next) => {
       status: "error",
       code: 401,
       message: "Email or password is wrong",
+    });
+  }
+
+  if (!user.verify) {
+    return res.status(401).json({
+      status: "error",
+      code: 401,
+      message: "Verification not completed",
     });
   }
 
@@ -100,9 +114,71 @@ const getCurrent = async (req, res, next) => {
   });
 };
 
+const verify = async (req, res, next) => {
+  const { verificationToken } = req.params;
+
+  const user = await service.getUserByVerificationToken(verificationToken);
+
+  if (!user) {
+    return res.status(404).json({
+      status: "error",
+      code: 404,
+      message: "User not found",
+    });
+  }
+
+  await service.setUserAsVerified(user.id);
+
+  res.status(200).json({
+    status: "success",
+    code: 200,
+    message: "User verification successfull",
+  });
+};
+
+const resendEmail = async (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      status: "bad request",
+      code: 400,
+      message: "Missing required field email",
+    });
+  }
+
+  const user = await service.getUserByEmail(email);
+
+  if (!user) {
+    return res.status(404).json({
+      status: "error",
+      code: 404,
+      message: "User not found",
+    });
+  }
+
+  if (user.verify) {
+    return res.status(400).json({
+      status: "bad request",
+      code: 400,
+      message: "Verification has already been passed",
+    });
+  }
+
+  await emailService.sendVerificationEmail(user.email, user.verificationToken);
+
+  res.status(200).json({
+    status: "success",
+    code: 200,
+    message: "Verification email sent",
+  });
+};
+
 module.exports = {
   createUser,
   login,
   logout,
   getCurrent,
+  verify,
+  resendEmail,
 };
